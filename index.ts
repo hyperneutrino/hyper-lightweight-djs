@@ -96,7 +96,8 @@ export async function loadCommands(client: Client<true>, directory: string, guil
 
     await Promise.all(
         files.map(async (file) => {
-            const { default: item } = await import(path.resolve(file.parentPath, file.name));
+            const absolutePath = path.resolve(file.parentPath, file.name);
+            const { default: item } = await import(absolutePath);
 
             if (item instanceof SlashCommand) {
                 commandData.push(item.data);
@@ -109,7 +110,9 @@ export async function loadCommands(client: Client<true>, directory: string, guil
                 commandData.push(item.data);
                 messageCommandHandlers.set(item.data.name, item.handler);
             } else {
-                console.warn(`WARN Command loader did not recognize the export from ${file.name} as a command.`);
+                throw new Error(
+                    `Loading commands failed: export from ${path.relative(path.resolve(directory), absolutePath)} was not an instance of <Type>Command.`,
+                );
             }
         }),
     );
@@ -166,7 +169,7 @@ export async function loadInteractions(client: Client<true>, directory: string, 
             } else if (item instanceof ChannelSelectResponder) {
                 channelHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
             } else {
-                console.warn(`WARN Command loader did not recognize the export from ${relativePath} as an interaction handler.`);
+                throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Responder.`);
             }
         }),
     );
@@ -194,8 +197,14 @@ export async function loadEvents(client: Client<true>, directory: string, recurs
     await Promise.all(
         files.map(async (file) => {
             if (file.isDirectory()) return;
-            const { default: item } = await import(path.resolve(file.parentPath, file.name));
+            const absolutePath = path.resolve(file.parentPath, file.name);
+            const { default: item } = await import(absolutePath);
             if (item instanceof EventHandler) (handlers[item.event as keyof ClientEvents] ??= []).push(item.handler);
+            else {
+                throw new Error(
+                    `Loading events failed: export from ${path.relative(path.resolve(directory), absolutePath)} was not an instance of EventHandler<T>.`,
+                );
+            }
         }),
     );
 
