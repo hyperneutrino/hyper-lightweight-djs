@@ -140,14 +140,14 @@ async function loadSubcommands(directory: string): Promise<{
     const options: ApplicationCommandSubCommandData[] = [];
     const handlers = new Map<string, Handler<ChatInputCommandInteraction>>();
 
-    await importAll({ directory, recursive: false }, async ({ file, relativePath, item }) => {
+    await importAll({ directory, recursive: false }, async ({ file, absolutePath, item }) => {
         if (item instanceof Subcommand) {
             options.push({ ...item.data, type: ApplicationCommandOptionType.Subcommand });
             handlers.set(item.data.name, item.handler);
-        } else throw new Error(`Loading commands failed: export from ${relativePath} (third-level in commands folder) was not an instance of Subcommand.`);
+        } else throw new Error(`Loading commands failed: export from ${absolutePath} (third-level in commands folder) was not an instance of Subcommand.`);
 
         if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
-            throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
+            throw new Error(`Code style enforcement: name exported from ${absolutePath} does not match the filename`);
     });
 
     return { options, handlers };
@@ -162,7 +162,7 @@ async function loadSubcommandsAndGroups(directory: string): Promise<{
     const options: (ApplicationCommandSubGroupData | ApplicationCommandSubCommandData)[] = [];
     const handlers = new Map<string, Handler<ChatInputCommandInteraction>>();
 
-    await importAll({ directory, recursive: false }, async ({ file, relativePath, item }) => {
+    await importAll({ directory, recursive: false }, async ({ file, absolutePath, relativePath, item }) => {
         if (item instanceof Subcommand) {
             options.push({ ...item.data, type: ApplicationCommandOptionType.Subcommand });
             handlers.set(`/${item.data.name}`, item.handler);
@@ -172,11 +172,11 @@ async function loadSubcommandsAndGroups(directory: string): Promise<{
             subcommands.handlers.entries().forEach(([key, handler]) => handlers.set(`${item.data.name}/${key}`, handler));
         } else
             throw new Error(
-                `Loading commands failed: export from ${relativePath} (second-level in commands folder) was not an instance of SubcommandGroup or Subcommand.`,
+                `Loading commands failed: export from ${absolutePath} (second-level in commands folder) was not an instance of SubcommandGroup or Subcommand.`,
             );
 
         if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
-            throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
+            throw new Error(`Code style enforcement: name exported from ${absolutePath} does not match the filename`);
     });
 
     return {
@@ -194,7 +194,7 @@ export async function loadCommands(client: Client<true>, directory: string, opti
 
     const slashCommandAutocompletes = new Map<string, Handler<AutocompleteInteraction>>();
 
-    await importAll({ directory, recursive: false }, async ({ file, relativePath, item }) => {
+    await importAll({ directory, recursive: false }, async ({ file, absolutePath, relativePath, item }) => {
         if (item instanceof SlashCommand) {
             commandData.push({ ...item.data, type: ApplicationCommandType.ChatInput });
             slashCommandHandlers.set(item.data.name, item.handler);
@@ -210,11 +210,11 @@ export async function loadCommands(client: Client<true>, directory: string, opti
             commandData.push({ ...item.data, options });
             slashCommandHandlers.set(item.data.name, handler);
         } else {
-            throw new Error(`Loading commands failed: export from ${relativePath} was not an instance of <Type>Command.`);
+            throw new Error(`Loading commands failed: export from ${absolutePath} was not an instance of <Type>Command.`);
         }
 
         if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
-            throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
+            throw new Error(`Code style enforcement: name exported from ${absolutePath} does not match the filename`);
     });
 
     client.on(Events.InteractionCreate, (interaction) => {
@@ -248,9 +248,9 @@ export async function loadInteractions(client: Client, directory: string, argume
     const mentionSelectHandlers = new Map<string, Handler<MentionableSelectMenuInteraction>>();
     const channelSelectHandlers = new Map<string, Handler<ChannelSelectMenuInteraction>>();
 
-    await importAll({ directory, recursive: true }, async ({ relativePath, item }) => {
+    await importAll({ directory, recursive: true }, async ({ absolutePath, item }) => {
         const handlerKey = path
-            .relative(directory, relativePath)
+            .relative(path.resolve(directory), absolutePath)
             .replace(/\.[^/.]+$/, "")
             .replace(/\\/g, "/");
 
@@ -261,7 +261,7 @@ export async function loadInteractions(client: Client, directory: string, argume
         else if (item instanceof RoleSelectHandler) roleSelectHandlers.set(handlerKey, item.handler);
         else if (item instanceof MentionSelectHandler) mentionSelectHandlers.set(handlerKey, item.handler);
         else if (item instanceof ChannelSelectHandler) channelSelectHandlers.set(handlerKey, item.handler);
-        else throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Handler.`);
+        else throw new Error(`Loading interactions failed: export from ${absolutePath} was not an instance of <InteractionType>Handler.`);
     });
 
     client.on(Events.InteractionCreate, (interaction) => {
@@ -286,12 +286,12 @@ export async function loadEvents(client: Client, directory: string, recursive: b
     const handlers: Partial<{ [K in keyof ClientEvents]: ((...args: ClientEvents[K]) => unknown)[] }> = {};
     const filenames: Partial<{ [K in keyof ClientEvents]: string[] }> = {};
 
-    await importAll({ directory, recursive }, async ({ relativePath, item }) => {
+    await importAll({ directory, recursive }, async ({ absolutePath, item }) => {
         if (item instanceof EventHandler) {
             (handlers[item.event as keyof ClientEvents] ??= []).push(item.handler);
-            (filenames[item.event as keyof ClientEvents] ??= []).push(path.relative(directory, relativePath));
+            (filenames[item.event as keyof ClientEvents] ??= []).push(path.relative(path.resolve(directory), absolutePath));
         } else {
-            throw new Error(`Loading events failed: export from ${relativePath} was not an instance of EventHandler<T>.`);
+            throw new Error(`Loading events failed: export from ${absolutePath} was not an instance of EventHandler<T>.`);
         }
     });
 
