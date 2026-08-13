@@ -31,7 +31,7 @@ process.on("uncaughtException", (err) => console.error(err));
 
 type Handler<T extends CommandInteraction | AutocompleteInteraction | MessageComponentInteraction | ModalSubmitInteraction> = (
     interaction: T,
-    ...args: any[]
+    ...args: T extends MessageComponentInteraction | ModalSubmitInteraction ? (string | undefined)[] : []
 ) => Awaitable<unknown>;
 
 abstract class Command<T extends BaseApplicationCommandData, U extends CommandInteraction, Z extends boolean = false> {
