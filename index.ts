@@ -96,6 +96,8 @@ export async function loadCommands(client: Client<true>, directory: string, guil
 
     await Promise.all(
         files.map(async (file) => {
+            if (file.isDirectory()) return;
+
             const absolutePath = path.resolve(file.parentPath, file.name);
 
             const { default: item } = await import(absolutePath);

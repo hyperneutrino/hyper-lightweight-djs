@@ -1,7 +1,7 @@
 {
     "name": "@hyperneutrino/djs-lite",
     "private": false,
-    "version": "1.2.3",
+    "version": "1.2.4",
     "module": "index.ts",
     "type": "module",
     "devDependencies": {
