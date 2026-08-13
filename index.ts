@@ -151,7 +151,7 @@ export async function loadInteractions(client: Client, directory: string, argume
 
             const absolutePath = path.resolve(file.parentPath, file.name);
             const relativePath = path.relative(path.resolve(directory), absolutePath);
-            const handlerKey = relativePath.replace(/\.[^/.]+$/, "");
+            const handlerKey = relativePath.replace(/\.[^/.]+$/, "").replace(/\\/g, "/");
 
             const { default: item } = await import(absolutePath).catch(() => null);
 
