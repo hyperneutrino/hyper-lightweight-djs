@@ -249,7 +249,10 @@ export async function loadInteractions(client: Client, directory: string, argume
     const channelSelectHandlers = new Map<string, Handler<ChannelSelectMenuInteraction>>();
 
     await importAll({ directory, recursive: true }, async ({ relativePath, item }) => {
-        const handlerKey = relativePath.replace(/\.[^/.]+$/, "").replace(/\\/g, "/");
+        const handlerKey = path
+            .relative(directory, relativePath)
+            .replace(/\.[^/.]+$/, "")
+            .replace(/\\/g, "/");
 
         if (item instanceof ModalHandler) modalHandlers.set(handlerKey, item.handler);
         else if (item instanceof ButtonHandler) buttonHandlers.set(handlerKey, item.handler);
