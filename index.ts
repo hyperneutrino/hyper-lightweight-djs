@@ -134,7 +134,7 @@ export async function loadCommands(client: Client<true>, directory: string, guil
     }
 }
 
-export async function loadInteractions(client: Client<true>, directory: string, argumentSeparator: string = ":") {
+export async function loadInteractions(client: Client, directory: string, argumentSeparator: string = ":") {
     const files = await fs.readdir(path.resolve(directory), { recursive: true, withFileTypes: true });
 
     const modalHandlers = new Map<string, Handler<ModalSubmitInteraction>>();
@@ -182,7 +182,7 @@ export async function loadInteractions(client: Client<true>, directory: string, 
     });
 }
 
-export async function loadEvents(client: Client<true>, directory: string, recursive: boolean = false) {
+export async function loadEvents(client: Client, directory: string, recursive: boolean = false) {
     const files = await fs.readdir(path.resolve(directory), { recursive, withFileTypes: true });
     const handlers: Partial<{ [K in keyof ClientEvents]: ((...args: ClientEvents[K]) => unknown)[] }> = {};
 
