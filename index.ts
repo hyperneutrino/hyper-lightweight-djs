@@ -1,4 +1,5 @@
 import {
+    ApplicationCommandOptionType,
     ApplicationCommandType,
     AutocompleteInteraction,
     ButtonInteraction,
@@ -12,6 +13,8 @@ import {
     RoleSelectMenuInteraction,
     StringSelectMenuInteraction,
     UserSelectMenuInteraction,
+    type ApplicationCommandSubCommandData,
+    type ApplicationCommandSubGroupData,
     type Awaitable,
     type BaseApplicationCommandData,
     type ChatInputApplicationCommandData,
@@ -22,6 +25,7 @@ import {
     type UserApplicationCommandData,
     type UserContextMenuCommandInteraction,
 } from "discord.js";
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -53,9 +57,35 @@ abstract class Command<T extends BaseApplicationCommandData, U extends CommandIn
     }
 }
 
-export class SlashCommand extends Command<ChatInputApplicationCommandData & { type: ApplicationCommandType.ChatInput }, ChatInputCommandInteraction, true> {}
-export class UserCommand extends Command<UserApplicationCommandData, UserContextMenuCommandInteraction> {}
-export class MessageCommand extends Command<MessageApplicationCommandData, MessageContextMenuCommandInteraction> {}
+export class SlashCommand extends Command<Omit<ChatInputApplicationCommandData, "type">, ChatInputCommandInteraction, true> {}
+export class UserCommand extends Command<Omit<UserApplicationCommandData, "type">, UserContextMenuCommandInteraction> {}
+export class MessageCommand extends Command<Omit<MessageApplicationCommandData, "type">, MessageContextMenuCommandInteraction> {}
+
+export class SlashCommandWithSubcommands {
+    data: Omit<ChatInputApplicationCommandData, "options" | "type">;
+
+    constructor(data: typeof this.data) {
+        this.data = data;
+    }
+}
+
+export class SubcommandGroup {
+    data: Omit<ApplicationCommandSubGroupData, "options" | "type">;
+
+    constructor(data: typeof this.data) {
+        this.data = data;
+    }
+}
+
+export class Subcommand {
+    data: Omit<ApplicationCommandSubCommandData, "type">;
+    handler: Handler<ChatInputCommandInteraction>;
+
+    constructor({ handler, ...data }: typeof this.data & { handler: Subcommand["handler"] }) {
+        this.data = data;
+        this.handler = handler;
+    }
+}
 
 abstract class ComponentHandler<T extends ModalSubmitInteraction | MessageComponentInteraction> {
     handler: Handler<T>;
@@ -83,6 +113,80 @@ export class EventHandler<T extends keyof ClientEvents> {
     }
 }
 
+async function importAll(
+    { directory, recursive }: { directory: string; recursive: boolean },
+    consumer: (data: { file: Dirent<string>; relativePath: string; absolutePath: string; item: unknown }) => unknown,
+) {
+    const files = await fs.readdir(path.resolve(directory), { recursive, withFileTypes: true });
+
+    await Promise.all(
+        files.map(async (file) => {
+            if (file.isDirectory()) return;
+
+            const absolutePath = path.resolve(file.parentPath, file.name);
+            const relativePath = path.relative(path.resolve(directory), absolutePath);
+
+            const { default: item } = await import(absolutePath);
+
+            await consumer({ file, relativePath, absolutePath, item });
+        }),
+    );
+}
+
+export async function loadSubcommands(directory: string): Promise<{
+    options: ApplicationCommandSubCommandData[];
+    handlers: Map<string, Handler<ChatInputCommandInteraction>>;
+}> {
+    if (!(await fs.exists(directory))) throw new Error(`Loading subcommands within a group failed: ${directory} is required but could not be found.`);
+
+    const options: ApplicationCommandSubCommandData[] = [];
+    const handlers = new Map<string, Handler<ChatInputCommandInteraction>>();
+
+    await importAll({ directory, recursive: false }, async ({ file, relativePath, item }) => {
+        if (item instanceof Subcommand) {
+            options.push({ ...item.data, type: ApplicationCommandOptionType.Subcommand });
+            handlers.set(item.data.name, item.handler);
+        } else throw new Error(`Loading commands failed: export from ${relativePath} (third-level in commands folder) was not an instance of Subcommand.`);
+
+        if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
+            throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
+    });
+
+    return { options, handlers };
+}
+
+export async function loadSubcommandsAndGroups(directory: string): Promise<{
+    options: (ApplicationCommandSubGroupData | ApplicationCommandSubCommandData)[];
+    handler: Handler<ChatInputCommandInteraction>;
+}> {
+    if (!(await fs.exists(directory))) throw new Error(`Loading subcomands/groups failed: ${directory} is required but could not be found.`);
+
+    const options: (ApplicationCommandSubGroupData | ApplicationCommandSubCommandData)[] = [];
+    const handlers = new Map<string, Handler<ChatInputCommandInteraction>>();
+
+    await importAll({ directory, recursive: false }, async ({ file, relativePath, item }) => {
+        if (item instanceof Subcommand) {
+            options.push({ ...item.data, type: ApplicationCommandOptionType.Subcommand });
+            handlers.set(`/${item.data.name}`, item.handler);
+        } else if (item instanceof SubcommandGroup) {
+            const subcommands = await loadSubcommands(relativePath.replace(/\.[^/.]+$/, ""));
+            options.push({ ...item.data, type: ApplicationCommandOptionType.SubcommandGroup, options: subcommands.options });
+            subcommands.handlers.entries().forEach(([key, handler]) => handlers.set(`${item.data.name}/${key}`, handler));
+        } else
+            throw new Error(
+                `Loading commands failed: export from ${relativePath} (second-level in commands folder) was not an instance of SubcommandGroup or Subcommand.`,
+            );
+
+        if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
+            throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
+    });
+
+    return {
+        options,
+        handler: (cmd) => handlers.get(`${cmd.options.getSubcommandGroup(false) ?? ""}/${cmd.options.getSubcommand(true)}`)?.(cmd),
+    };
+}
+
 export async function loadCommands(client: Client<true>, directory: string, guildId?: string) {
     const files = await fs.readdir(path.resolve(directory), { recursive: false, withFileTypes: true });
 
@@ -99,23 +203,30 @@ export async function loadCommands(client: Client<true>, directory: string, guil
             if (file.isDirectory()) return;
 
             const absolutePath = path.resolve(file.parentPath, file.name);
+            const relativePath = path.relative(path.resolve(directory), absolutePath);
 
             const { default: item } = await import(absolutePath);
 
             if (item instanceof SlashCommand) {
+                commandData.push({ ...item.data, type: ApplicationCommandType.ChatInput });
                 slashCommandHandlers.set(item.data.name, item.handler);
                 if (item.autocomplete) slashCommandAutocompletes.set(item.data.name, item.autocomplete);
             } else if (item instanceof UserCommand) {
+                commandData.push({ ...item.data, type: ApplicationCommandType.User });
                 userCommandHandlers.set(item.data.name, item.handler);
             } else if (item instanceof MessageCommand) {
+                commandData.push({ ...item.data, type: ApplicationCommandType.Message });
                 messageCommandHandlers.set(item.data.name, item.handler);
+            } else if (item instanceof SlashCommandWithSubcommands) {
+                const { options, handler } = await loadSubcommandsAndGroups(relativePath.replace(/\.[^/.]+$/, ""));
+                commandData.push({ ...item.data, options });
+                slashCommandHandlers.set(item.data.name, handler);
             } else {
-                throw new Error(
-                    `Loading commands failed: export from ${path.relative(path.resolve(directory), absolutePath)} was not an instance of <Type>Command.`,
-                );
+                throw new Error(`Loading commands failed: export from ${relativePath} was not an instance of <Type>Command.`);
             }
 
-            commandData.push(item.data);
+            if (item.data.name !== file.name.replace(/.[^/.]+$/, ""))
+                throw new Error(`Code style enforcement: name exported from ${relativePath} does not match the filename`);
         }),
     );
 
