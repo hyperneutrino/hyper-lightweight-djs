@@ -29,8 +29,6 @@ import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-// TODO: comments (requires some refactoring of types to do right)
-
 process.on("uncaughtException", (err) => console.error(err));
 
 type Handler<T extends CommandInteraction | AutocompleteInteraction | MessageComponentInteraction | ModalSubmitInteraction> = (
@@ -245,7 +243,7 @@ export async function loadInteractions(client: Client, directory: string, argume
     const mentionHandlers = new Map<string, Handler<MentionableSelectMenuInteraction>>();
     const channelHandlers = new Map<string, Handler<ChannelSelectMenuInteraction>>();
 
-    await importAll({ directory, recursive: true }, async ({ file, relativePath, item }) => {
+    await importAll({ directory, recursive: true }, async ({ relativePath, item }) => {
         const handlerKey = relativePath.replace(/\.[^/.]+$/, "").replace(/\\/g, "/");
 
         if (item instanceof ModalHandler) modalHandlers.set(handlerKey, item.handler);
