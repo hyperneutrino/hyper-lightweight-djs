@@ -185,7 +185,7 @@ async function loadSubcommandsAndGroups(directory: string): Promise<{
     };
 }
 
-export async function loadCommands(client: Client<true>, directory: string, guildId?: string) {
+export async function loadCommands(client: Client<true>, directory: string, options?: { guildId?: string; skipSettingCommands?: boolean }) {
     const commandData: (ChatInputApplicationCommandData | UserApplicationCommandData | MessageApplicationCommandData)[] = [];
 
     const slashCommandHandlers = new Map<string, Handler<ChatInputCommandInteraction>>();
@@ -224,10 +224,13 @@ export async function loadCommands(client: Client<true>, directory: string, guil
         else if (interaction.isAutocomplete()) slashCommandAutocompletes.get(interaction.commandName)?.(interaction);
     });
 
-    if (guildId) {
-        const testGuild = client.guilds.resolve(guildId);
+    if (options?.skipSettingCommands) "Do nothing";
+    else if (options?.guildId) {
+        const testGuild = client.guilds.resolve(options.guildId);
         if (!testGuild)
-            throw new Error(`Provided test guild (${guildId}) can not be found, please make sure the bot you started this project on is in this guild.`);
+            throw new Error(
+                `Provided test guild (${options.guildId}) can not be found, please make sure the bot you started this project on is in this guild.`,
+            );
         await testGuild.commands.set(commandData);
     } else {
         await client.application.commands.set(commandData);
