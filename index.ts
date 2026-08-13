@@ -278,15 +278,18 @@ export async function loadInteractions(client: Client, directory: string, argume
 
 export async function loadEvents(client: Client, directory: string, recursive: boolean = false) {
     const handlers: Partial<{ [K in keyof ClientEvents]: ((...args: ClientEvents[K]) => unknown)[] }> = {};
+    const filenames: Partial<{ [K in keyof ClientEvents]: string[] }> = {};
 
     await importAll({ directory, recursive }, async ({ relativePath, item }) => {
-        if (item instanceof EventHandler) (handlers[item.event as keyof ClientEvents] ??= []).push(item.handler);
-        else {
+        if (item instanceof EventHandler) {
+            (handlers[item.event as keyof ClientEvents] ??= []).push(item.handler);
+            (filenames[item.event as keyof ClientEvents] ??= []).push(path.relative(directory, relativePath));
+        } else {
             throw new Error(`Loading events failed: export from ${relativePath} was not an instance of EventHandler<T>.`);
         }
     });
 
     Object.entries(handlers).forEach(([key, handlers]) => client.on(key, (...args) => handlers.forEach((handler) => (handler as any)(...args))));
 
-    return { handlers };
+    return { handlers, filenames };
 }
