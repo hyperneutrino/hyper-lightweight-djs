@@ -232,27 +232,29 @@ export async function loadCommands(client: Client<true>, directory: string, guil
     } else {
         await client.application.commands.set(commandData);
     }
+
+    return { commands: commandData, slashCommandHandlers, userCommandHandlers, messageCommandHandlers };
 }
 
 export async function loadInteractions(client: Client, directory: string, argumentSeparator: string = ":") {
     const modalHandlers = new Map<string, Handler<ModalSubmitInteraction>>();
     const buttonHandlers = new Map<string, Handler<ButtonInteraction>>();
-    const stringHandlers = new Map<string, Handler<StringSelectMenuInteraction>>();
-    const userHandlers = new Map<string, Handler<UserSelectMenuInteraction>>();
-    const roleHandlers = new Map<string, Handler<RoleSelectMenuInteraction>>();
-    const mentionHandlers = new Map<string, Handler<MentionableSelectMenuInteraction>>();
-    const channelHandlers = new Map<string, Handler<ChannelSelectMenuInteraction>>();
+    const stringSelectHandlers = new Map<string, Handler<StringSelectMenuInteraction>>();
+    const userSelectHandlers = new Map<string, Handler<UserSelectMenuInteraction>>();
+    const roleSelectHandlers = new Map<string, Handler<RoleSelectMenuInteraction>>();
+    const mentionSelectHandlers = new Map<string, Handler<MentionableSelectMenuInteraction>>();
+    const channelSelectHandlers = new Map<string, Handler<ChannelSelectMenuInteraction>>();
 
     await importAll({ directory, recursive: true }, async ({ relativePath, item }) => {
         const handlerKey = relativePath.replace(/\.[^/.]+$/, "").replace(/\\/g, "/");
 
         if (item instanceof ModalHandler) modalHandlers.set(handlerKey, item.handler);
         else if (item instanceof ButtonHandler) buttonHandlers.set(handlerKey, item.handler);
-        else if (item instanceof StringSelectHandler) stringHandlers.set(handlerKey, item.handler);
-        else if (item instanceof UserSelectHandler) userHandlers.set(handlerKey, item.handler);
-        else if (item instanceof RoleSelectHandler) roleHandlers.set(handlerKey, item.handler);
-        else if (item instanceof MentionSelectHandler) mentionHandlers.set(handlerKey, item.handler);
-        else if (item instanceof ChannelSelectHandler) channelHandlers.set(handlerKey, item.handler);
+        else if (item instanceof StringSelectHandler) stringSelectHandlers.set(handlerKey, item.handler);
+        else if (item instanceof UserSelectHandler) userSelectHandlers.set(handlerKey, item.handler);
+        else if (item instanceof RoleSelectHandler) roleSelectHandlers.set(handlerKey, item.handler);
+        else if (item instanceof MentionSelectHandler) mentionSelectHandlers.set(handlerKey, item.handler);
+        else if (item instanceof ChannelSelectHandler) channelSelectHandlers.set(handlerKey, item.handler);
         else throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Handler.`);
     });
 
@@ -264,12 +266,14 @@ export async function loadInteractions(client: Client, directory: string, argume
 
         if (interaction.isModalSubmit()) modalHandlers.get(path)?.(interaction, ...args);
         else if (interaction.isButton()) buttonHandlers.get(path)?.(interaction, ...args);
-        else if (interaction.isStringSelectMenu()) stringHandlers.get(path)?.(interaction, ...args);
-        else if (interaction.isUserSelectMenu()) userHandlers.get(path)?.(interaction, ...args);
-        else if (interaction.isRoleSelectMenu()) roleHandlers.get(path)?.(interaction, ...args);
-        else if (interaction.isMentionableSelectMenu()) mentionHandlers.get(path)?.(interaction, ...args);
-        else if (interaction.isChannelSelectMenu()) channelHandlers.get(path)?.(interaction, ...args);
+        else if (interaction.isStringSelectMenu()) stringSelectHandlers.get(path)?.(interaction, ...args);
+        else if (interaction.isUserSelectMenu()) userSelectHandlers.get(path)?.(interaction, ...args);
+        else if (interaction.isRoleSelectMenu()) roleSelectHandlers.get(path)?.(interaction, ...args);
+        else if (interaction.isMentionableSelectMenu()) mentionSelectHandlers.get(path)?.(interaction, ...args);
+        else if (interaction.isChannelSelectMenu()) channelSelectHandlers.get(path)?.(interaction, ...args);
     });
+
+    return { modalHandlers, buttonHandlers, stringSelectHandlers, userSelectHandlers, roleSelectHandlers, mentionSelectHandlers, channelSelectHandlers };
 }
 
 export async function loadEvents(client: Client, directory: string, recursive: boolean = false) {
@@ -283,4 +287,6 @@ export async function loadEvents(client: Client, directory: string, recursive: b
     });
 
     Object.entries(handlers).forEach(([key, handlers]) => client.on(key, (...args) => handlers.forEach((handler) => (handler as any)(...args))));
+
+    return { handlers };
 }
