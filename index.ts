@@ -131,7 +131,7 @@ async function importAll(
     );
 }
 
-export async function loadSubcommands(directory: string): Promise<{
+async function loadSubcommands(directory: string): Promise<{
     options: ApplicationCommandSubCommandData[];
     handlers: Map<string, Handler<ChatInputCommandInteraction>>;
 }> {
@@ -153,7 +153,7 @@ export async function loadSubcommands(directory: string): Promise<{
     return { options, handlers };
 }
 
-export async function loadSubcommandsAndGroups(directory: string): Promise<{
+async function loadSubcommandsAndGroups(directory: string): Promise<{
     options: (ApplicationCommandSubGroupData | ApplicationCommandSubCommandData)[];
     handler: Handler<ChatInputCommandInteraction>;
 }> {
