@@ -97,23 +97,23 @@ export async function loadCommands(client: Client<true>, directory: string, guil
     await Promise.all(
         files.map(async (file) => {
             const absolutePath = path.resolve(file.parentPath, file.name);
+
             const { default: item } = await import(absolutePath);
 
             if (item instanceof SlashCommand) {
-                commandData.push(item.data);
                 slashCommandHandlers.set(item.data.name, item.handler);
                 if (item.autocomplete) slashCommandAutocompletes.set(item.data.name, item.autocomplete);
             } else if (item instanceof UserCommand) {
-                commandData.push(item.data);
                 userCommandHandlers.set(item.data.name, item.handler);
             } else if (item instanceof MessageCommand) {
-                commandData.push(item.data);
                 messageCommandHandlers.set(item.data.name, item.handler);
             } else {
                 throw new Error(
                     `Loading commands failed: export from ${path.relative(path.resolve(directory), absolutePath)} was not an instance of <Type>Command.`,
                 );
             }
+
+            commandData.push(item.data);
         }),
     );
 
@@ -151,26 +151,18 @@ export async function loadInteractions(client: Client<true>, directory: string, 
 
             const absolutePath = path.resolve(file.parentPath, file.name);
             const relativePath = path.relative(path.resolve(directory), absolutePath);
+            const handlerKey = relativePath.replace(/\.[^/.]+$/, "");
 
             const { default: item } = await import(absolutePath).catch(() => null);
 
-            if (item instanceof ModalResponder) {
-                modalHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof ButtonResponder) {
-                buttonHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof StringSelectResponder) {
-                stringHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof UserSelectResponder) {
-                userHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof RoleSelectResponder) {
-                roleHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof MentionSelectResponder) {
-                mentionHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else if (item instanceof ChannelSelectResponder) {
-                channelHandlers.set(relativePath.replace(/\.[^/.]+$/, ""), item.handler);
-            } else {
-                throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Responder.`);
-            }
+            if (item instanceof ModalResponder) modalHandlers.set(handlerKey, item.handler);
+            else if (item instanceof ButtonResponder) buttonHandlers.set(handlerKey, item.handler);
+            else if (item instanceof StringSelectResponder) stringHandlers.set(handlerKey, item.handler);
+            else if (item instanceof UserSelectResponder) userHandlers.set(handlerKey, item.handler);
+            else if (item instanceof RoleSelectResponder) roleHandlers.set(handlerKey, item.handler);
+            else if (item instanceof MentionSelectResponder) mentionHandlers.set(handlerKey, item.handler);
+            else if (item instanceof ChannelSelectResponder) channelHandlers.set(handlerKey, item.handler);
+            else throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Responder.`);
         }),
     );
 
@@ -197,8 +189,11 @@ export async function loadEvents(client: Client<true>, directory: string, recurs
     await Promise.all(
         files.map(async (file) => {
             if (file.isDirectory()) return;
+
             const absolutePath = path.resolve(file.parentPath, file.name);
+
             const { default: item } = await import(absolutePath);
+
             if (item instanceof EventHandler) (handlers[item.event as keyof ClientEvents] ??= []).push(item.handler);
             else {
                 throw new Error(
