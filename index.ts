@@ -57,7 +57,7 @@ export class SlashCommand extends Command<ChatInputApplicationCommandData & { ty
 export class UserCommand extends Command<UserApplicationCommandData, UserContextMenuCommandInteraction> {}
 export class MessageCommand extends Command<MessageApplicationCommandData, MessageContextMenuCommandInteraction> {}
 
-abstract class ComponentResponder<T extends ModalSubmitInteraction | MessageComponentInteraction> {
+abstract class ComponentHandler<T extends ModalSubmitInteraction | MessageComponentInteraction> {
     handler: Handler<T>;
 
     constructor(handler: Handler<T>) {
@@ -65,13 +65,13 @@ abstract class ComponentResponder<T extends ModalSubmitInteraction | MessageComp
     }
 }
 
-export class ModalResponder extends ComponentResponder<ModalSubmitInteraction> {}
-export class ButtonResponder extends ComponentResponder<ButtonInteraction> {}
-export class StringSelectResponder extends ComponentResponder<StringSelectMenuInteraction> {}
-export class UserSelectResponder extends ComponentResponder<UserSelectMenuInteraction> {}
-export class RoleSelectResponder extends ComponentResponder<RoleSelectMenuInteraction> {}
-export class MentionSelectResponder extends ComponentResponder<MentionableSelectMenuInteraction> {}
-export class ChannelSelectResponder extends ComponentResponder<ChannelSelectMenuInteraction> {}
+export class ModalHandler extends ComponentHandler<ModalSubmitInteraction> {}
+export class ButtonHandler extends ComponentHandler<ButtonInteraction> {}
+export class StringSelectHandler extends ComponentHandler<StringSelectMenuInteraction> {}
+export class UserSelectHandler extends ComponentHandler<UserSelectMenuInteraction> {}
+export class RoleSelectHandler extends ComponentHandler<RoleSelectMenuInteraction> {}
+export class MentionSelectHandler extends ComponentHandler<MentionableSelectMenuInteraction> {}
+export class ChannelSelectHandler extends ComponentHandler<ChannelSelectMenuInteraction> {}
 
 export class EventHandler<T extends keyof ClientEvents> {
     event: T;
@@ -155,14 +155,14 @@ export async function loadInteractions(client: Client<true>, directory: string, 
 
             const { default: item } = await import(absolutePath).catch(() => null);
 
-            if (item instanceof ModalResponder) modalHandlers.set(handlerKey, item.handler);
-            else if (item instanceof ButtonResponder) buttonHandlers.set(handlerKey, item.handler);
-            else if (item instanceof StringSelectResponder) stringHandlers.set(handlerKey, item.handler);
-            else if (item instanceof UserSelectResponder) userHandlers.set(handlerKey, item.handler);
-            else if (item instanceof RoleSelectResponder) roleHandlers.set(handlerKey, item.handler);
-            else if (item instanceof MentionSelectResponder) mentionHandlers.set(handlerKey, item.handler);
-            else if (item instanceof ChannelSelectResponder) channelHandlers.set(handlerKey, item.handler);
-            else throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Responder.`);
+            if (item instanceof ModalHandler) modalHandlers.set(handlerKey, item.handler);
+            else if (item instanceof ButtonHandler) buttonHandlers.set(handlerKey, item.handler);
+            else if (item instanceof StringSelectHandler) stringHandlers.set(handlerKey, item.handler);
+            else if (item instanceof UserSelectHandler) userHandlers.set(handlerKey, item.handler);
+            else if (item instanceof RoleSelectHandler) roleHandlers.set(handlerKey, item.handler);
+            else if (item instanceof MentionSelectHandler) mentionHandlers.set(handlerKey, item.handler);
+            else if (item instanceof ChannelSelectHandler) channelHandlers.set(handlerKey, item.handler);
+            else throw new Error(`Loading interactions failed: export from ${relativePath} was not an instance of <InteractionType>Handler.`);
         }),
     );
 
